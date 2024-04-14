@@ -127,7 +127,7 @@ _hotspot_resolver() {
         -F ":" \
 	'{print $1}')"
   _msg=(
-    "connecting to ${_user}@${_host}:${_port}"
+    "connecting to ${_host}"
     )
   _msg_info \
     "${_msg[*]}"
@@ -228,7 +228,7 @@ _make_conf() {
     _get_address \
       "${_device}")"
   echo \
-    "${_host}=${_address##*.}:${_port}" >> \
+    "${_host}=${_address##*.}" >> \
     "${_conf}"
 }
 
@@ -241,13 +241,9 @@ _check_conf() {
     _port \
     _msg=() \
     _perm
-  _dir="${HOME}/.config/$(_get \
-                            "app" \
-                            "name")"
-  _conf="${_dir}/localhosts.cfg"
   _msg=(
     "Configuration file:"
-    "${_conf}"
+    "$(_conf_path)"
   )
   _msg_info \
     "${_msg[*]}"
@@ -357,6 +353,7 @@ _read_conf() {
   fi
 }
 
+
 _set_overrides() {
   _set_override \
     "target" \
@@ -434,10 +431,10 @@ _show_config() {
       '%(%FT%R%z)T' \
       "${SOURCE_DATE_EPOCH}"
   _msg_info "${app_name} configuration"
-  _msg_info "             Resolve date:   $(_get "_build" "date")"
-  _msg_info "                    Hosts:"
-    _display_flags                        "${target_hosts[@]}"
+  _msg_info "             Resolve date:   $(_get "_resolve" "date")"
+  _msg_info "              Target host:   $(_get "target" "host")"
   _msg_info "                   Device:   $(_get "target" "device")"
+  _msg_info "                  Network:   $(_get "target" "network")"
 }
 
 _globals
@@ -497,7 +494,11 @@ _hotspot_resolver \
   "$( \
     _get \
       "target" \
-      "host")"
+      "host")" \
+  "$( \
+    _get \
+      "target" \
+      "device")" \
   "$( \
     _get \
       "target" \
