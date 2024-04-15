@@ -197,6 +197,21 @@ _hotspot_resolver() {
     "${_msg[*]}"
 }
 
+_get_gateway() {
+  local \
+    _gateway
+  _gateway="$( \
+    _route | \
+      grep \
+        "${_device}" | 
+      grep  \
+        "${_ns}" | \
+        awk \
+          '{print $2}')"
+  echo \
+    "${_gateway}"
+}
+
 # Get subnet from IPv4 address
 # $1: address
 _get_subnet() {
@@ -471,6 +486,7 @@ _show_config() {
   _msg_info "              Target host:   $(_get "target" "host")"
   _msg_info "                   Device:   $(_get "target" "device")"
   _msg_info "                  Network:   $(_get "target" "network")"
+  _msg_info "                  Gateway:   $(_get "target" "network")"
 }
 
 _globals
