@@ -22,7 +22,67 @@ _global_variables() {
 }
 
 _requirements() {
-  true
+  _check_cmd \
+    "ifconfig"
+  _check_cmd \
+    "route"
+  _check_cmd \
+    "iwgetid"
+  _check_cmd \
+    "hostnamectl"
+  # Check optional switch
+  # in _check_cmd
+  # _check_cmd \
+  #   "su"
+}
+
+_termux_get_network_ssid() {
+  termux-wifi-connectioninfo | \
+    jq \
+      -r \
+      '.ssid'
+}
+
+_termux_get_network_bssid() {
+  termux-wifi-connectioninfo | \
+    jq \
+      -r \
+      '.bssid'
+}
+
+_get_network_ssid() {
+  local \
+    _ssid \
+  _ssid="$( \
+    iwgetid \
+      -r)"
+  if [[ "${_ssid}" == "" ]]; then
+    [[ "${TERMUX_VERSION}" != "" ]] && \
+      _ssid="$( \
+        _termux_get_network_ssid)"
+  fi
+  echo \
+    "${_ssid}"
+}
+
+_get_network_bssid() {
+  local \
+    _bssid \
+  _bssid="$( \
+    iwgetid \
+      -ar)"
+  if [[ "${_bssid}" == "" ]]; then
+    [[ "${TERMUX_VERSION}" != "" ]] && \
+      _bssid="$( \
+        _termux_get_network_bssid)"
+  fi
+  echo \
+    "${_bssid}"
+}
+
+_get_network() {
+  echo \
+    "$(_get_network_ssid)_$(_get_network_bssid)"
 }
 
 _ifconfig() {
@@ -52,6 +112,10 @@ _ifconfig() {
     "${_out}"
 }
 
+_wifi_device() {
+  iw
+}
+
 # Local network resolver
 # $1: hostname of the device to connect
 # $2: network device name
@@ -76,8 +140,8 @@ _hotspot_resolver() {
         "${_device}")"
   [[ "${_address}" == "" ]] && \
       _msg=(
-	"${_device} is not connected"
-        "to a network.") && \
+	"${_device} has no address"
+        "on a network.") && \
       _msg_error \
         "${_msg[*]}" \
         1
@@ -238,7 +302,6 @@ _check_conf() {
     _address \
     _dir \
     _host \
-    _port \
     _msg=() \
     _perm
   _msg=(
@@ -274,32 +337,6 @@ _input_credentials() {
         _host
     done
   fi
-  printf \
-    -v \
-      "_port" \
-    "%s\n" \
-    "$( \
-      _get \
-        "target" \
-        "port")"
-  _msg_info \
-    "setting local port as target port ${_port}"
-  if \
-    [[ \
-      "${_port}" == "" ]]; then
-    printf \
-      "  %s\n" \
-      "enter port for this host:"
-    while \
-      [[ \
-        "${_port}" == "" ]]; do
-      read \
-        -r \
-        _port
-    done
-  fi
-  _msg_info \
-    "Set port ${_port}"
 }
 
 _conf_path() {
@@ -353,12 +390,11 @@ _read_conf() {
   fi
 }
 
-
 _set_overrides() {
   _set_override \
     "target" \
     "network" \
-    "default"
+    "$(_get_network)"
   _set_override \
     "target" \
     "device" \
@@ -393,7 +429,7 @@ usage:
   options:
      -d <device>          Specify network device
                           Default: '$(_get "target" "device")'
-     -n <ssid>            Specify wireless network ssid
+     -n <ssid_bsid>       Specify wireless network ssid
                           Default: '$(_get "target" "network")'
      -g                   Specify host is the gateway
 
@@ -440,7 +476,10 @@ _show_config() {
 _globals
 _global_variables
 _requirements
-_config_user_init
+_config_user_init \
+  "$(_get \
+       "app" \
+       "name")"
 # shellcheck disable=SC2034
 while \
   getopts \
