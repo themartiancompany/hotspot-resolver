@@ -19,6 +19,7 @@ _global_variables() {
   target_network=""
   target_device=""
   target_gateway=""
+  target_address=""
   color=""
   quiet=""
 }
@@ -145,11 +146,41 @@ _hotspot_resolver() {
   local \
     _command="${1}" \
     _args=()
-  shift \
-    1
-  _args=(
-    $@
-  )
+  if [[ "${_command}" == "get" ]]; then
+    _args=(
+      "$( \
+        _get \
+          "target" \
+          "host")"
+      "$( \
+        _get \
+          "target" \
+          "device")"
+      "$( \
+        _get \
+          "target" \
+          "network")"
+      "$( \
+        _get \
+          "target" \
+          "gateway")"
+      )
+  elif [[ "${_command}" == "set" ]]; then
+    _args=(
+      "$( \
+        _get \
+          "target" \
+          "host")"
+      "$( \
+        _get \
+          "target" \
+          "device")"
+      "$( \
+        _get \
+          "target" \
+          "address")"
+    )
+  fi
   "_${_command}_host_address" \
     "${_args[@]}"
 }
@@ -157,12 +188,14 @@ _hotspot_resolver() {
 _set_host_address() {
   local \
     _host="${1}" \
-    _address="${2}"
+    _device="${2}" \
+    _address="${3}"
   _msg_info \
     "Setting address ${_address} for ${_host}"
   _make_conf \
     "$(_get_conf_path)" \
     "${_host}" \
+    "${_device}" \
     "${_address}" \
     "false"
 }
@@ -193,7 +226,8 @@ _get_host_address() {
         "${_device}")"
     _cfg="$( \
       _get_conf \
-        "${_host}")"
+        "${_host}" \
+        "${_device}")"
     _target="${_subnet}.${_cfg}"
     if [[ "${_cfg}" == "gateway" ]]; then
       _target="$( \
@@ -416,8 +450,9 @@ _make_conf() {
   local \
     _conf="${1}" \
     _host="${2}" \
-    _address="${3}" \
-    _new="${4}"
+    _device="${3}" \
+    _address="${4}" \
+    _new="${5}"
   mkdir \
     -p \
     "$(dirname \
@@ -486,6 +521,7 @@ _check_conf_permissions() {
 _get_conf() {
   local \
     _host="${1}" \
+    _device="${2}" \
     _conf \
     _cfg \
     _msg=()
@@ -493,7 +529,8 @@ _get_conf() {
   if [ ! -e  "${_conf}" ]; then
     _make_conf \
       "${_conf}" \
-      "" \
+      "${_host}" \
+      "${_device}" \
       "" \
       "true"
   fi
@@ -512,6 +549,7 @@ _get_conf() {
     _make_conf \
       "${_conf}" \
       "${_host}" \
+      "${_device}" \
       "" \
       "false"
     _cfg="$( \
@@ -707,12 +745,17 @@ _set \
   "target" \
   "host" \
   "${2}"
+(( $# == 3 )) && \
+_set \
+  "target" \
+  "address" \
+  "${3}"
+_set_overrides
 _config_user_init \
   "$( \
     _get \
       "app" \
       "name")"
-_set_overrides
 [[ "$(_get \
         "target" \
         "device")" == "" ]] && \
@@ -726,22 +769,6 @@ _hotspot_resolver \
   "$( \
     _get \
       "target" \
-      "command")" \
-  "$( \
-    _get \
-      "target" \
-      "host")" \
-  "$( \
-    _get \
-      "target" \
-      "device")" \
-  "$( \
-    _get \
-      "target" \
-      "device")" \
-  "$( \
-    _get \
-      "target" \
-      "gateway")"
+      "command")"
 
 # vim:set sw=2 sts=-1 et:
