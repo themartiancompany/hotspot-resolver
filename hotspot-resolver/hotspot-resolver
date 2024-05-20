@@ -468,8 +468,9 @@ _get_conf() {
       "${_conf}" \
       "${_host}")"
   if [[ "${_cfg}" == "" ]]; then
-    _msg_info \
-      "No address configured for ${_host}"
+    _msg_error \
+      "No address configured for ${_host}" \
+      1
     _make_conf \
       "${_conf}" \
       "${_host}" \
