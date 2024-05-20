@@ -395,7 +395,7 @@ _make_conf() {
       "# device=111" >> \
       "${_conf}"
   [[ "${_host}" == "" ]] && \
-    _host="$(_detect_hostname)"
+    _host="$(_hostname_detect)"
   [[ "${_host}" == "" ]] && \
     _input \
     "_host" \
