@@ -14,6 +14,7 @@ source \
 
 # shellcheck disable=SC2034
 _global_variables() {
+  target_command=""
   target_host=""
   target_network=""
   target_device=""
@@ -82,8 +83,16 @@ _get_network_bssid() {
 }
 
 _get_network() {
+  local \
+    _bssid \
+    _i
+  _bssid="$( \
+    _get_network_bssid)"
+  _bssid="${_bssid%:*}"
+  _bssid="${_bssid%:*}"
+  _bssid="${_bssid%:*}"
   echo \
-    "$(_get_network_ssid)_$(_get_network_bssid)"
+    "$(_get_network_ssid)_${_bssid}"
 }
 
 _ifconfig() {
@@ -132,11 +141,37 @@ _device_exists() {
   fi
 }
 
+_hotspot_resolver() {
+  local \
+    _command="${1}" \
+    _args=()
+  shift \
+    1
+  _args=(
+    $@
+  )
+  "_${_command}_host_address" \
+    "${_args[@]}"
+}
+
+_set_host_address() {
+  local \
+    _host="${1}" \
+    _address="${2}"
+  _msg_info \
+    "Setting address ${_address} for ${_host}"
+  _make_conf \
+    "$(_get_conf_path)" \
+    "${_host}" \
+    "${_address}" \
+    "false"
+}
+
 # Local network resolver
 # $1: hostname of the device to connect
 # $2: network device name
 # $3: network essid
-_hotspot_resolver() {
+_get_host_address() {
   local \
     _host="${1}" \
     _device="${2}" \
@@ -238,7 +273,7 @@ _get_subnet_ifconfig() {
     _device="${1}" \
     _address
   _address="$( \
-    _get_address \
+    _get_device_address \
       "${_device}")"
   echo \
     "${_address%.*}"
@@ -334,7 +369,7 @@ _get_subnet() {
     "${_subnet_ifconfig}"
 }
 
-_get_address() {
+_get_device_address() {
   local \
     _device="${1}" \
     _msg=() \
@@ -387,19 +422,22 @@ _make_conf() {
     -p \
     "$(dirname \
          "${_conf}")"
-  [[ "${_new}" == true ]] && \
+  if [[ "${_new}" == true ]]; then
     echo \
       "# values go from 2 to 254" >> \
-      "${_conf}" && \
+      "${_conf}"
     echo \
       "# device=111" >> \
       "${_conf}"
-  [[ "${_host}" == "" ]] && \
+  fi
+  if [[ "${_host}" == "" ]]; then
     _host="$(_hostname_detect)"
-  [[ "${_host}" == "" ]] && \
+  fi
+  if [[ "${_host}" == "" ]]; then
     _input \
     "_host" \
     "enter name for this host"
+  fi
   [[ "${_address}" == "" ]] && \
   [[ "${_new}" != "true" ]] && \
     _input \
@@ -407,7 +445,7 @@ _make_conf() {
     "enter address for target host (empty for self)"
   [[ "${_address}" == "" ]] && \
   _address="$( \
-    _get_address \
+    _get_device_address \
       "${_device}")"
   echo \
     "${_host}=${_address##*.}" >> \
@@ -558,7 +596,12 @@ Returns an host address for given network on a given network device
 usage:
   $(_get "app" "name")
     [options]
+    <command>
     <host>
+    (<address>)
+  commands:
+     get                  Get address for an host
+     set                  Set address for an host
   options:
      -d <device>          Specify network device
                           Default: '$(_get "target" "device")'
@@ -642,7 +685,14 @@ shift \
   $(( \
     OPTIND - 1 \
   ))
-(( $# < 1 )) && \
+(( $# < 2 )) && \
+  _msg_error \
+    "no command given" \
+    0 && \
+  _set_overrides && \
+  _usage \
+    1
+(( $# < 2 )) && \
   _msg_error \
     "no host given" \
     0 && \
@@ -651,8 +701,17 @@ shift \
     1
 _set \
   "target" \
-  "host" \
+  "command" \
   "${1}"
+_set \
+  "target" \
+  "host" \
+  "${2}"
+_config_user_init \
+  "$( \
+    _get \
+      "app" \
+      "name")"
 _set_overrides
 [[ "$(_get \
         "target" \
@@ -664,6 +723,10 @@ _set_overrides
     1
 _show_config
 _hotspot_resolver \
+  "$( \
+    _get \
+      "target" \
+      "command")" \
   "$( \
     _get \
       "target" \
