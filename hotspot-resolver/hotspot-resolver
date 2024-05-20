@@ -452,12 +452,6 @@ _get_conf() {
     _cfg \
     _msg=()
   _conf="$(_get_conf_path)"
-  _msg=(
-    "Configuration file:"
-    "${_conf}"
-  )
-  _msg_info \
-    "${_msg[*]}"
   if [ ! -e  "${_conf}" ]; then
     _make_conf \
       "${_conf}" \
