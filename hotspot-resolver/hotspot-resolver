@@ -14,9 +14,12 @@ source \
 
 # shellcheck disable=SC2034
 _global_variables() {
+  target_command=""
   target_host=""
   target_network=""
   target_device=""
+  target_gateway=""
+  target_address=""
   color=""
   quiet=""
 }
@@ -38,7 +41,7 @@ _requirements() {
   # Check optional switch
   # in _check_cmd
   # _check_cmd \
-  #   "su"
+  #   "sudo"
 }
 
 _termux_get_network_ssid() {
@@ -86,8 +89,16 @@ _get_network_bssid() {
 }
 
 _get_network() {
+  local \
+    _bssid \
+    _i
+  _bssid="$( \
+    _get_network_bssid)"
+  _bssid="${_bssid%:*}"
+  _bssid="${_bssid%:*}"
+  _bssid="${_bssid%:*}"
   echo \
-    "$(_get_network_ssid)_$(_get_network_bssid)"
+    "$(_get_network_ssid)_${_bssid}"
 }
 
 _ifconfig() {
@@ -121,152 +132,287 @@ _wifi_device() {
   iw
 }
 
+_device_exists() {
+  local \
+    _device="${1}" \
+    _exists
+  _exists="$( \
+    _ifconfig | \
+      grep \
+        "${_device}")"
+  if [[ "${_exists}" == "" ]]; then
+    _msg_error \
+      "No device '${_device}' detected" \
+      1
+  fi
+}
+
+_hotspot_resolver() {
+  local \
+    _command="${1}" \
+    _args=()
+  if [[ "${_command}" == "get" ]]; then
+    _args=(
+      "$( \
+        _get \
+          "target" \
+          "host")"
+      "$( \
+        _get \
+          "target" \
+          "device")"
+      "$( \
+        _get \
+          "target" \
+          "network")"
+      "$( \
+        _get \
+          "target" \
+          "gateway")"
+      )
+  elif [[ "${_command}" == "set" ]]; then
+    _args=(
+      "$( \
+        _get \
+          "target" \
+          "host")"
+      "$( \
+        _get \
+          "target" \
+          "device")"
+      "$( \
+        _get \
+          "target" \
+          "address")"
+    )
+  fi
+  "_${_command}_host_address" \
+    "${_args[@]}"
+}
+
+_set_host_address() {
+  local \
+    _host="${1}" \
+    _device="${2}" \
+    _address="${3}"
+  _msg_info \
+    "Setting address ${_address} for ${_host}"
+  _make_conf \
+    "$(_get_conf_path)" \
+    "${_host}" \
+    "${_device}" \
+    "${_address}" \
+    "false"
+}
+
 # Local network resolver
 # $1: hostname of the device to connect
 # $2: network device name
 # $3: network essid
-_hotspot_resolver() {
+_get_host_address() {
   local \
     _host="${1}" \
     _device="${2}" \
     _network="${3}" \
-    _args=() \
+    _gateway="${4}" \
     _msg=() \
+    _target \
     _cfg \
-    _hostname \
-    _address="" \
-    _ns
-  [[ "$( \
-       _ifconfig | \
-          grep \
-            "${_device}")" != "" ]] && \
-    _address="$( \
-      _get_address \
+    _subnet
+  _device_exists \
+    "${_device}"
+  if [[ "${_gateway}" == "y" ]]; then
+    _target="$( \
+      _get_gateway \
         "${_device}")"
-  [[ "${_address}" == "" ]] && \
-      _msg=(
-	"${_device} has no address"
-        "on a network.") && \
-      _msg_error \
-        "${_msg[*]}" \
-        1
-  _msg=(
-    "device ${_device}"
-    "has address ${_address}"
-  )
-  _msg_info \
-    "${_msg[*]}"
-  _ns="$( \
-    _get_subnet \
-      "${_address}")"
-  [[ "$(_confirm_subnet \
-          "${_device}" \
-          "${_ns}")" != "" ]] && \
-    _msg_error \
-      "anomalous behaviour" \
-      1
-  [[ "${_ns}" == "" ]] && \
-    _msg=(
-      "${_device} is not connected"
-      "to a network.") && \
-    _msg_error \
-      "${_msg[*]}" \
-      1
-  _msg=(
-    "${_device} is on subnet"
-    "${_ns}.0")
-  _msg_info \
-    "${_msg[*]}"
-  _read_conf
-  _hostname="$( \
-    echo \
-      "${_cfg}" | \
-      grep "${_host}=" | \
-        awk \
-	  -F "=" \
-	  '{print $2}')"
-  [[ "${_hostname}" == "" ]] && \
-    _msg_error \
-      "No address configured for ${_host}" \
-      1
-  _hostname="$( \
-    echo \
-      "${_hostname}" | \
-      awk \
-        -F ":" \
-	'{print $1}')"
-  _msg=(
-    "connecting to ${_host}"
-    )
-  _msg_info \
-    "${_msg[*]}"
+  elif [[ "${_gateway}" == "n" ]]; then
+    _subnet="$( \
+      _get_subnet \
+        "${_device}")"
+    _cfg="$( \
+      _get_conf \
+        "${_host}" \
+        "${_device}")"
+    _target="${_subnet}.${_cfg}"
+    if [[ "${_cfg}" == "gateway" ]]; then
+      _target="$( \
+        _get_gateway \
+          "${_device}")"
+    fi
+  fi
+  echo \
+    "${_target}"
 }
 
-_get_gateway() {
+_get_gateway_route() {
   local \
+    _device="${1}" \
     _gateway
   _gateway="$( \
     _route | \
       grep \
-        "${_device}" | 
-      grep  \
-        "${_ns}" | \
+        "${_device}" | \
         awk \
           '{print $2}')"
   echo \
     "${_gateway}"
 }
 
+_get_gateway_iproute() {
+  local \
+    _device="${1}" \
+    _gateway
+  _gateway="$( \
+    _iproute | \
+      grep \
+        "${_device}" | \
+        awk \
+          '{print $9}')"
+  echo \
+    "${_gateway}"
+}
+
+_get_gateway() {
+  local \
+    _device="${1}" \
+    _gateway_route \
+    _gateway_iproute
+  _gateway_route="$( \
+    _get_gateway_route \
+      "${_device}")"
+  _gateway_iproute="$( \
+    _get_gateway_iproute \
+      "${_device}")"
+  if [[ "${_gateway_iproute}" != \
+        "${_gateway_route}" ]]; then
+    _msg=(
+      "Mismatch between 'ip route' (${_gateway_iproute})"
+      "and 'route' (${_gateway_route:-None}) outputs."
+      "Cannot confirm gateway."
+    )
+    _msg_warning \
+      "${_msg[*]}"
+  fi
+  if [[ "${_gateway_iproute}" == "" ]]; then
+    _msg=(
+      "${_device} is not connected"
+      "to a network.") && \
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  echo \
+    "${_gateway_iproute}"
+}
+
 # Get subnet from IPv4 address
 # $1: address
-_get_subnet() {
+_get_subnet_ifconfig() {
   local \
-    _address="${1}"
+    _device="${1}" \
+    _address
+  _address="$( \
+    _get_device_address \
+      "${_device}")"
   echo \
     "${_address%.*}"
 }
 
-_route() {
-  route \
-    2>&1
+_iproute() {
+  local \
+    _no_ip=() \
+    _out
+  _no_ip=(
+    "Cannot bind netlink socket:"
+    "Permission denied"
+  )
+  _out="$( \
+    ip route \
+      2>&1)"
+  [[  "${_out}" == \
+      *"${_no_ip[*]}"* ]] && \
+  _out="$( \
+    sudo \
+      ip \
+        route)"
+  echo \
+    "${_out}"
 }
 
-_confirm_subnet() {
+
+_route() {
   local \
-    _device="${1}" \
-    _ns="${2}" \
-    _confirm \
-    _no_route=()
+    _no_route=() \
+    _out
   _no_route=(
     "INET (IPv4) not configured"
     "in this system.")
-  _confirm="$( \
-    _get_subnet \
-      "$(_route | \
-           grep \
-	     "${_device}" | 
-           grep  \
-             "${_ns}" | \
-	     awk \
-	       '{print $1}')")"
-  [[  "$(_route)" == \
-      "${_no_route[*]}" ]] && \
-    return
-  if [[ "${_ns}" != \
-     "${_confirm}" ]]; then
+  _out="$( \
+    route \
+      2>&1)"
+  [[  "${_out}" == \
+      *"${_no_route[*]}"* ]] && \
+  _out="$( \
+    sudo \
+      route)"
+  echo \
+    "${_out}"
+}
+
+_get_subnet_route() {
+  local \
+    _device="${1}" \
+    _subnet
+  _subnet="$( \
+    _route | \
+      grep \
+        "${_device}" | 
+        awk \
+          '{print $1}')"
+  echo \
+    "${_subnet%.*}"
+}
+
+# Get subnet for a device
+# $1: device
+_get_subnet() {
+  local \
+    _device="${1}" \
+    _subnet_ifconfig \
+    _subnet_route
+  _subnet_ifconfig="$( \
+    _get_subnet_ifconfig \
+      "${_device}")"
+  _subnet_route="$( \
+    _get_subnet_route \
+      "${_device}")"
+  if [[ "${_subnet_ifconfig}" != \
+        "${_subnet_route}" ]]; then
     _msg=(
-      "Mismatch between 'ifconfig' (${_ns})"
-      "and 'route' (${_confirm:-None}) outputs."
+      "Mismatch between 'ifconfig' (${_subnet_ifconfig})"
+      "and 'route' (${_subnet_route:-None}) outputs."
       "Cannot confirm subnet."
     )
     _msg_warning \
       "${_msg[*]}"
   fi
+  if [[ "${_subnet_ifconfig}" == "" ]]; then
+    _msg=(
+      "${_device} is not connected"
+      "to a network.") && \
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
+  echo \
+    "${_subnet_ifconfig}"
 }
 
-_get_address() {
+_get_device_address() {
   local \
     _device="${1}" \
+    _msg=() \
+    _address \
     _line
   _line="$( \
     _ifconfig | \
@@ -278,62 +424,94 @@ _get_address() {
           -f 1)"
   _line=$(( \
     _line + 1 ))
-  _ifconfig | \
-    sed \
-      -n \
-        "${_line}p;" | \
-      awk \
-        '{print $2}'
+  _address="$( \
+    _ifconfig | \
+      sed \
+        -n \
+          "${_line}p;" | \
+        awk \
+          '{print $2}')"
+  [[ "${_address}" == "" ]] && \
+    _msg=(
+      "${_device} has no address"
+      "on a network.") && \
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  echo \
+    "${_address}"
+}
+
+_hostname_detect() {
+  if [[ "$(command \
+             -v \
+             "hostnamectl")" != "" ]]; then
+    hostnamectl \
+      hostname
+  fi
 }
 
 _make_conf() {
   local \
-    _conf="${1}"
+    _conf="${1}" \
+    _host="${2}" \
+    _device="${3}" \
+    _address="${4}" \
+    _new="${5}"
   mkdir \
     -p \
     "$(dirname \
          "${_conf}")"
-  echo \
-    "# values go from 2 to 254" >> \
-    "${_conf}"
-  echo \
-    "# device=111" >> \
-    "${_conf}"
-  [[ \
-    "$( \
-      command \
-        -v \
-        "hostnamectl")" != "" ]] && \
-    _host="$( \
-      hostnamectl \
-        hostname)"
-  _input_credentials
+  if [[ "${_new}" == true ]]; then
+    echo \
+      "# values go from 2 to 254" >> \
+      "${_conf}"
+    echo \
+      "# device=111" >> \
+      "${_conf}"
+  fi
+  if [[ "${_host}" == "" ]]; then
+    _host="$(_hostname_detect)"
+  fi
+  if [[ "${_host}" == "" ]]; then
+    _input \
+    "_host" \
+    "enter name for this host"
+  fi
+  [[ "${_address}" == "" ]] && \
+  [[ "${_new}" != "true" ]] && \
+    _input \
+    "_address" \
+    "enter address for target host (empty for self)"
+  [[ "${_address}" == "" ]] && \
   _address="$( \
-    _get_address \
+    _get_device_address \
       "${_device}")"
   echo \
     "${_host}=${_address##*.}" >> \
     "${_conf}"
 }
 
-_check_conf() {
+_is_conf_empty() {
   local \
     _conf="${1}" \
-    _address \
-    _dir \
-    _host \
-    _msg=() \
-    _perm
-  _msg=(
-    "Configuration file:"
-    "$(_conf_path)"
-  )
-  _msg_info \
-    "${_msg[*]}"
-      if [ ! -e  "$(_conf_path)" ]; then
-    _make_conf \
-      "$(_conf_path)"
+    _cfg
+  _cfg="$( \
+    _comments_remove_get_assign \
+      "$( \
+        cat \
+          "${_conf}")")"
+  if [[ "${_cfg}" == '' ]]; then
+    _msg_error \
+      "empty configuration file!" \
+      1
   fi
+}
+
+_check_conf_permissions() {
+  local \
+    _conf="${1}" \
+    _perm
   _perm="$( \
     stat \
       -c '%a' \
@@ -345,21 +523,50 @@ _check_conf() {
   fi
 }
 
-_input_credentials() {
-  if [[ "${_host}" == "" ]]; then
-    printf \
-      "  %s\n" \
-      "enter name for this host:" && \
-    while \
-      [[ ! -v "_host" ]]; do
-      read \
-        -r \
-        _host
-    done
+_get_conf() {
+  local \
+    _host="${1}" \
+    _device="${2}" \
+    _conf \
+    _cfg \
+    _msg=()
+  _conf="$(_get_conf_path)"
+  if [ ! -e  "${_conf}" ]; then
+    _make_conf \
+      "${_conf}" \
+      "${_host}" \
+      "${_device}" \
+      "" \
+      "true"
   fi
+  _check_conf_permissions \
+    "${_conf}"
+  _is_conf_empty \
+    "${_conf}"
+  _cfg="$( \
+    _read_setting \
+      "${_conf}" \
+      "${_host}")"
+  if [[ "${_cfg}" == "" ]]; then
+    _msg_error \
+      "No address configured for ${_host}" \
+      1
+    _make_conf \
+      "${_conf}" \
+      "${_host}" \
+      "${_device}" \
+      "" \
+      "false"
+    _cfg="$( \
+      _read_setting \
+        "${_conf}" \
+        "${_host}")"
+  fi
+  echo \
+    "${_cfg}"
 }
 
-_conf_path() {
+_get_conf_path() {
   local \
     _dir \
     _conf
@@ -392,24 +599,6 @@ _comments_remove_get_assign() {
         "="
 }
 
-_read_conf() {
-  local \
-    _hostname="" \
-    _network=""
-  _check_conf \
-    "$(_conf_path)"
-  _cfg="$( \
-    _comments_remove_get_assign \
-      "$( \
-        cat \
-          "$(_conf_path)")")"
-  if [[ "${_cfg}" == '' ]]; then
-    _msg_error \
-      "empty configuration file!" \
-      1
-  fi
-}
-
 _set_overrides() {
   _set_override \
     "target" \
@@ -419,6 +608,10 @@ _set_overrides() {
     "target" \
     "device" \
     "wlan0"
+  _set_override \
+    "target" \
+    "gateway" \
+    "n"
   if [[ -v override_quiet ]]; then
     quiet="${override_quiet}"
   elif [[ -z "${quiet}" ]]; then
@@ -442,10 +635,16 @@ _usage() {
       -d '' \
       _usage_text << \
         ENDUSAGETEXT || true
+Returns an host address for given network on a given network device
 usage:
   $(_get "app" "name")
     [options]
+    <command>
     <host>
+    (<address>)
+  commands:
+     get                  Get address for an host
+     set                  Set address for an host
   options:
      -d <device>          Specify network device
                           Default: '$(_get "target" "device")'
@@ -491,7 +690,7 @@ _show_config() {
   _msg_info "              Target host:   $(_get "target" "host")"
   _msg_info "                   Device:   $(_get "target" "device")"
   _msg_info "                  Network:   $(_get "target" "network")"
-  _msg_info "                  Gateway:   $(_get "target" "network")"
+  _msg_info "                  Gateway:   $(_get "target" "gateway")"
 }
 
 _globals
@@ -504,13 +703,13 @@ _config_user_init \
 # shellcheck disable=SC2034
 while \
   getopts \
-    'd:gcvh?' \
+    'd:n:gcvh?' \
     arg; do
   case \
     "${arg}" in
     d) override_target_device="${OPTARG}" ;;
     n) override_target_network="${OPTARG}" ;;
-    g) override_gateway_resolve="y" ;;
+    g) override_target_gateway="y" ;;
     c) override_color="y" ;;
     v) override_quiet="n" ;;
     h|?) _set_overrides && \
@@ -529,7 +728,14 @@ shift \
   $(( \
     OPTIND - 1 \
   ))
-(( $# < 1 )) && \
+(( $# < 2 )) && \
+  _msg_error \
+    "no command given" \
+    0 && \
+  _set_overrides && \
+  _usage \
+    1
+(( $# < 2 )) && \
   _msg_error \
     "no host given" \
     0 && \
@@ -538,9 +744,23 @@ shift \
     1
 _set \
   "target" \
-  "host" \
+  "command" \
   "${1}"
+_set \
+  "target" \
+  "host" \
+  "${2}"
+(( $# == 3 )) && \
+_set \
+  "target" \
+  "address" \
+  "${3}"
 _set_overrides
+_config_user_init \
+  "$( \
+    _get \
+      "app" \
+      "name")"
 [[ "$(_get \
         "target" \
         "device")" == "" ]] && \
@@ -554,14 +774,6 @@ _hotspot_resolver \
   "$( \
     _get \
       "target" \
-      "host")" \
-  "$( \
-    _get \
-      "target" \
-      "device")" \
-  "$( \
-    _get \
-      "target" \
-      "device")"
+      "command")"
 
 # vim:set sw=2 sts=-1 et:
