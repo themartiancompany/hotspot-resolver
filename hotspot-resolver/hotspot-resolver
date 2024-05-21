@@ -726,7 +726,7 @@ shift \
 (( $# < 2 )) && \
   _msg_error \
     "no command given" \
-    0 && \
+    1 && \
   _set_overrides && \
   _usage \
     1
