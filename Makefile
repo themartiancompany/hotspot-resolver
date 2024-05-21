@@ -6,7 +6,7 @@ DOC_DIR=$(DESTDIR)$(PREFIX)/share/doc/hotspot-resolver
 BIN_DIR=$(DESTDIR)$(PREFIX)/bin
 
 DOC_FILES=$(wildcard *.rst)
-SCRIPT_FILES=$(wildcard dynssh/*)
+SCRIPT_FILES=$(wildcard hotspot-resolver/*)
 
 all:
 
