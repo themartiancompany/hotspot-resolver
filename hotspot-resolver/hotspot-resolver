@@ -27,7 +27,12 @@ _requirements() {
   _check_cmd \
     "route"
   _check_cmd \
-    "iwgetid"
+    "iwgetid" \
+    "wireless-tools"
+  [[ "${TERMUX_VERSION}" != "" ]] && \
+    _check_cmd \
+      "termux-wifi-connectioninfo" \
+      "termux-api"
   _check_cmd \
     "hostnamectl"
   # Check optional switch
