@@ -264,10 +264,8 @@ _get_gateway_iproute() {
     _gateway
   _gateway="$( \
     _iproute | \
-      grep \
-        "${_device}" | \
-        awk \
-          '{print $9}')"
+      awk \
+        '{print $3}')"
   echo \
     "${_gateway}"
 }
@@ -321,20 +319,34 @@ _get_subnet_ifconfig() {
 _iproute() {
   local \
     _no_ip=() \
+    _ip_opts=() \
+    _ip \
     _out
+  _ip_opts=(
+    route
+      list
+        match
+          0 
+        table 
+          all
+        scope
+          global
+  )
   _no_ip=(
     "Cannot bind netlink socket:"
     "Permission denied"
   )
   _out="$( \
-    ip route \
+    ip \
+      "${_ip_opts[@]}" \
       2>&1)"
   [[  "${_out}" == \
       *"${_no_ip[*]}"* ]] && \
   _out="$( \
     sudo \
       ip \
-        route)"
+        "${_ip_opts[@]}" \
+      2>&1)"
   echo \
     "${_out}"
 }
