@@ -504,37 +504,6 @@ _make_conf() {
     "${_conf}"
 }
 
-_is_conf_empty() {
-  local \
-    _conf="${1}" \
-    _cfg
-  _cfg="$( \
-    _comments_remove_get_assign \
-      "$( \
-        cat \
-          "${_conf}")")"
-  if [[ "${_cfg}" == '' ]]; then
-    _msg_error \
-      "empty configuration file!" \
-      1
-  fi
-}
-
-_check_conf_permissions() {
-  local \
-    _conf="${1}" \
-    _perm
-  _perm="$( \
-    stat \
-      -c '%a' \
-      "${_conf}")"
-  if [[ "${_perm}" != "600" ]]; then
-    chmod \
-      600 \
-      "${_conf}"
-  fi
-}
-
 _get_conf() {
   local \
     _host="${1}" \
@@ -551,9 +520,7 @@ _get_conf() {
       "" \
       "true"
   fi
-  _check_conf_permissions \
-    "${_conf}"
-  _is_conf_empty \
+  _check_conf \
     "${_conf}"
   _cfg="$( \
     _read_setting \
@@ -598,17 +565,6 @@ _get_conf_path() {
           "network").cfg"
   echo \
     "${_conf}"
-}
-
-_comments_remove_get_assign() {
-  local \
-    _text="${1}"
-  echo \
-    "${_text}" | \
-    sed \
-      -e "/# */d" | \
-      grep \
-        "="
 }
 
 _set_overrides() {
