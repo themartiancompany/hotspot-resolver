@@ -20,6 +20,7 @@ _global_variables() {
   target_device=""
   target_gateway=""
   target_address=""
+  TERMUX_VERSION=""
   color=""
   quiet=""
 }
