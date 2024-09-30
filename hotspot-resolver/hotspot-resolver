@@ -33,6 +33,7 @@ _requirements() {
   _check_cmd \
     "iwgetid" \
     "wireless-tools"
+  [ ! -n "TERMUX_VERSION" ] && \
   [[ "${TERMUX_VERSION}" != "" ]] && \
     _check_cmd \
       "termux-wifi-connectioninfo" \
