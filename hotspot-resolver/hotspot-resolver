@@ -14,15 +14,18 @@ source \
 
 # shellcheck disable=SC2034
 _global_variables() {
+  resolve_date=""
   target_command=""
   target_host=""
   target_network=""
   target_device=""
   target_gateway=""
   target_address=""
-  TERMUX_VERSION=""
   color=""
   quiet=""
+  if [[ -z "TERMUX_VERSION" ]]; then
+    TERMUX_VERSION=""
+  fi
 }
 
 _requirements() {
@@ -33,11 +36,11 @@ _requirements() {
   _check_cmd \
     "iwgetid" \
     "wireless-tools"
-  [ ! -n "TERMUX_VERSION" ] && \
-  [[ "${TERMUX_VERSION}" != "" ]] && \
+  if [[ -v "TERMUX_VERSION" ]]; then
     _check_cmd \
       "termux-wifi-connectioninfo" \
       "termux-api"
+  fi
   _check_cmd \
     "hostnamectl"
   # Check optional switch
@@ -67,9 +70,10 @@ _get_network_ssid() {
     iwgetid \
       -r)"
   if [[ "${_ssid}" == "" ]]; then
-    [[ "${TERMUX_VERSION}" != "" ]] && \
+    if [[ -v "TERMUX_VERSION" ]]; then
       _ssid="$( \
         _termux_get_network_ssid)"
+    fi
   fi
   echo \
     "${_ssid}"
@@ -82,9 +86,10 @@ _get_network_bssid() {
     iwgetid \
       -ar)"
   if [[ "${_bssid}" == "" ]]; then
-    [[ "${TERMUX_VERSION}" != "" ]] && \
+    if [[ -v "TERMUX_VERSION" ]]; then
       _bssid="$( \
         _termux_get_network_bssid)"
+    fi
   fi
   echo \
     "${_bssid}"
@@ -413,7 +418,7 @@ _get_subnet() {
   if [[ "${_subnet_ifconfig}" == "" ]]; then
     _msg=(
       "${_device} is not connected"
-      "to a network.") && \
+      "to a network.")
     _msg_error \
       "${_msg[*]}" \
       1
@@ -570,6 +575,20 @@ _get_conf_path() {
 }
 
 _set_overrides() {
+  if [[ -v override_quiet ]]; then
+    quiet="${override_quiet}"
+  elif [[ -z "${quiet}" ]]; then
+    quiet="y"
+  fi
+  if [[ -v override_color ]]; then
+    color="${override_color}"
+  elif [[ -z "${color}" ]]; then
+    color="n"
+  fi
+  _set_override \
+    "resolve" \
+    "date" \
+    "$(_get_date_human)"
   _set_override \
     "target" \
     "network" \
@@ -582,16 +601,6 @@ _set_overrides() {
     "target" \
     "gateway" \
     "n"
-  if [[ -v override_quiet ]]; then
-    quiet="${override_quiet}"
-  elif [[ -z "${quiet}" ]]; then
-    quiet="y"
-  fi
-  if [[ -v override_color ]]; then
-    color="${override_color}"
-  elif [[ -z "${color}" ]]; then
-    color="n"
-  fi
 }
 
 # Show help usage, with an exit status.
@@ -648,15 +657,8 @@ _display_flags() {
 
 # Shows configuration options.
 _show_config() {
-  local \
-    _resolve_date
-  TZ=UTC \
-    printf \
-      -v _resolve_date \
-      '%(%FT%R%z)T' \
-      "${SOURCE_DATE_EPOCH}"
   _msg_info "${app_name} configuration"
-  _msg_info "             Resolve date:   $(_get "_resolve" "date")"
+  _msg_info "             Resolve date:   $(_get "resolve" "date")"
   _msg_info "              Target host:   $(_get "target" "host")"
   _msg_info "                   Device:   $(_get "target" "device")"
   _msg_info "                  Network:   $(_get "target" "network")"
@@ -698,20 +700,22 @@ shift \
   $(( \
     OPTIND - 1 \
   ))
-(( $# < 2 )) && \
+if (( $# < 1 )); then
   _msg_error \
     "no command given" \
-    0 && \
-  _set_overrides && \
+    0 
+  _set_overrides
   _usage \
     1
-(( $# < 2 )) && \
+fi
+if (( $# < 2 )); then
   _msg_error \
     "no host given" \
-    0 && \
-  _set_overrides && \
+    0
+  _set_overrides
   _usage \
     1
+fi
 _set \
   "target" \
   "command" \
@@ -720,25 +724,27 @@ _set \
   "target" \
   "host" \
   "${2}"
-(( $# == 3 )) && \
+if (( $# == 3 )); then
 _set \
   "target" \
   "address" \
   "${3}"
+fi
 _set_overrides
 _config_user_init \
   "$( \
     _get \
       "app" \
       "name")"
-[[ "$(_get \
+if [[ "$(_get \
         "target" \
-        "device")" == "" ]] && \
+        "device")" == "" ]]; then
   _msg_error \
     "-d option is required" \
-    0 && \
+    0
   _usage \
     1
+fi
 _show_config
 _hotspot_resolver \
   "$( \
