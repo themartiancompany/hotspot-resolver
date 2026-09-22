@@ -43,7 +43,7 @@ dynamic SSH client.
 Let's say you know the `goody` host you want to connect
 to on the hotspot network has address usually ending in `42`.
 
-To set `42` as a global setting for `goody you type
+To set `42` as a global setting for `goody` you type
 
 ```bash
 hotspot-resolver \
