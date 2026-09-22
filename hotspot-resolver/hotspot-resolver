@@ -203,6 +203,7 @@ _hotspot_resolver() {
       "${_target_host}"
       "${_target_device}"
       "${_target_address}"
+      "${_target_gateway}"
       "${_global_setting}"
     )
   fi
@@ -265,6 +266,11 @@ _get_host_address() {
         "${_device}" \
         "${_global}")"
     _target="${_subnet}.${_cfg}"
+    _msg=(
+      "Got configuration '${_cfg}'."
+    )
+    _msg_info \
+      "${_msg[*]}"
     if [[ "${_cfg}" == "gateway" ]]; then
       _target="$(
         _get_gateway \
@@ -536,7 +542,11 @@ _make_conf() {
       "_address" \
       "${_msg[*]}"
   fi
-  _pref="${_address##*.}"
+  if [[ "${_address}" != "gateway" ]]; then
+    _pref="${_address##*.}"
+  else
+    _pref="${_address}"
+  fi
   if [[ "${_address}" == "" ]]; then
     _path="$(
       _get_conf_path \
