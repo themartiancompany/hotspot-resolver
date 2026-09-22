@@ -29,6 +29,10 @@ SSID; this makes hard for common users to reliably
 evaluate the IP address for another device on the local
 network.
 
+Hotspot resolver correctly returns the
+address for an host across reboots of the Android
+device which acts as hotspot.
+
 This program is a dependency for the
 [DynSSH](
   https://github.com/themartiancompany/dynssh)
