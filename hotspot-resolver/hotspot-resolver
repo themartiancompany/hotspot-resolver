@@ -298,13 +298,35 @@ _get_gateway_route() {
 _get_gateway_iproute() {
   local \
     _device="${1}" \
-    _gateway
-  _gateway="$(
+    _route \
+    _routes=() \
+    _gateways=()
+  local \
+    -A \
+    _routes_set
+  _routes=( $(
     _iproute |
       awk \
-        '{print $3}')"
+        '{print $3}')
+  )
+  for _route in "${_routes[@]}"; do
+    if [[ "${_route}" != ""  ]]; then
+      _routes_set["${_route}"]=1
+    fi
+  done
+  _gateways+=(
+    "${!_routes_set[@]}"
+  )
+  if (( 1 < "${#_gateways[@]}" )); then
+    _msg=(
+      "Detected two gateways '${_gateways[*]}'."
+    )
+    _msg_error \
+      "${_msg[*]}" \
+      1
+  fi
   echo \
-    "${_gateway}"
+    "${_gateways}"
 }
 
 _get_gateway() {
@@ -336,6 +358,10 @@ _get_gateway() {
       "${_msg[*]}" \
       1
   fi
+  if [[ "${quiet}" == "n" ]]; then
+    echo \
+      "Obtained gateway '${_gateway_iproute}'."
+  fi
   echo \
     "${_gateway_iproute}"
 }
@@ -358,7 +384,8 @@ _iproute() {
     _no_ip=() \
     _ip_opts=() \
     _ip \
-    _out
+    _out \
+    _msg=()
   _ip_opts=(
     route
       list
@@ -377,13 +404,14 @@ _iproute() {
     ip \
       "${_ip_opts[@]}" \
       2>&1)"
-  [[  "${_out}" == \
-      *"${_no_ip[*]}"* ]] && \
-  _out="$(
-    sudo \
-      ip \
-        "${_ip_opts[@]}" \
-      2>&1)"
+  if [[  "${_out}" == \
+      *"${_no_ip[*]}"* ]]; then
+    _out="$(
+      sudo \
+        ip \
+          "${_ip_opts[@]}" \
+        2>&1)"
+  fi
   echo \
     "${_out}"
 }
@@ -645,7 +673,7 @@ _get_conf_path() {
     _conf
   _global="n"
   if (( 0 < $# )); then
-    _global="y"
+    _global="${1}"
   fi
   _dir="${HOME}/.config/${app_name}"
   _device_dir="${_target_host}/${_target_device}"
