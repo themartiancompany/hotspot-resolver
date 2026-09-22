@@ -13,6 +13,7 @@ source \
 
 # shellcheck disable=SC2034
 _global_variables() {
+  resolve_date=""
   target_command=""
   target_host=""
   target_network=""
@@ -20,9 +21,11 @@ _global_variables() {
   target_gateway=""
   target_address=""
   global_setting=""
-  TERMUX_VERSION=""
   color=""
   quiet=""
+  if [[ -z "TERMUX_VERSION" ]]; then
+    TERMUX_VERSION=""
+  fi
 }
 
 _requirements() {
@@ -33,13 +36,12 @@ _requirements() {
   _check_cmd \
     "iwgetid" \
     "wireless-tools"
-  if [ ! -n "TERMUX_VERSION" ] && \
-     [[ "${TERMUX_VERSION}" != "" ]]; then
-    _check_cmd \
-      "jq"
+  if [[ -v "TERMUX_VERSION" ]]; then
     _check_cmd \
       "termux-wifi-connectioninfo" \
       "termux-api"
+    _check_cmd \
+      "jq"
   fi
   _check_cmd \
     "hostnamectl"
@@ -86,9 +88,10 @@ _get_network_bssid() {
     iwgetid \
       -ar)"
   if [[ "${_bssid}" == "" ]]; then
-    [[ "${TERMUX_VERSION}" != "" ]] && \
+    if [[ -v "TERMUX_VERSION" ]]; then
       _bssid="$(
         _termux_get_network_bssid)"
+    fi
   fi
   echo \
     "${_bssid}"
@@ -412,7 +415,7 @@ _get_subnet() {
   if [[ "${_subnet_ifconfig}" == "" ]]; then
     _msg=(
       "${_device} is not connected"
-      "to a network.") && \
+      "to a network.")
     _msg_error \
       "${_msg[*]}" \
       1
@@ -627,6 +630,10 @@ _set_overrides() {
     color="n"
   fi
   _set_override \
+    "resolve" \
+    "date" \
+    "$(_get_date_human)"
+  _set_override \
     "target" \
     "network" \
     "$(_get_network)"
@@ -793,7 +800,7 @@ _config_user_init \
   "${app_name}"
 if [[ "${target_device}" == "" ]]; then
   _msg=(
-    "-d option is required."
+    "Option '-d' is required."
   )
   _msg_error \
     "${_msg[*]}" \
