@@ -34,6 +34,34 @@ This program is a dependency for the
   https://github.com/themartiancompany/dynssh)
 dynamic SSH client.
 
+## How to use
+
+Let's say you know the `goody` host you want to connect
+to on the hotspot network has address usually ending in `42`.
+
+To set `42` as a global setting for `goody you type
+
+```bash
+hotspot-resolver \
+  -G \
+  set \
+    "goody" \
+      "42"
+```
+
+So now whenever you type
+
+```bash
+hotspot-resolver \
+  get \
+    "goody" \
+      "42"
+```
+
+you'll get the correct address for `goody` regardless
+of which specific Android hotspot instance they are connected
+to for easy use in other programs.
+
 ## Installation
 
 The program in this source repo
