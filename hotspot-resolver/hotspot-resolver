@@ -196,7 +196,8 @@ _hotspot_resolver() {
       "${_target_device}"
       "${_target_network}"
       "${_target_gateway}"
-      )
+      "${_global_setting}"
+    )
   elif [[ "${_command}" == "set" ]]; then
     _args=(
       "${_target_host}"
@@ -243,6 +244,7 @@ _get_host_address() {
     _device="${2}" \
     _network="${3}" \
     _gateway="${4}" \
+    _global="${5}" \
     _msg=() \
     _target \
     _cfg \
@@ -260,7 +262,8 @@ _get_host_address() {
     _cfg="$(
       _get_conf \
         "${_host}" \
-        "${_device}")"
+        "${_device}" \
+        "${_global}")"
     _target="${_subnet}.${_cfg}"
     if [[ "${_cfg}" == "gateway" ]]; then
       _target="$(
@@ -559,13 +562,15 @@ _get_conf() {
   local \
     _host="${1}" \
     _device="${2}" \
+    _global="${3}" \
     _conf \
     _conf_dir \
     _conf_global \
     _cfg \
     _msg=()
   _conf="$(
-    _get_conf_path)"
+    _get_conf_path \
+      "${_global}")"
   if [[ ! -e  "${_conf}" ]]; then
     _conf_global="$(
       _get_conf_path \
