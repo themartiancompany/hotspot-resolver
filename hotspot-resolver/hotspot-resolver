@@ -19,6 +19,7 @@ _global_variables() {
   target_device=""
   target_gateway=""
   target_address=""
+  global_setting=""
   TERMUX_VERSION=""
   color=""
   quiet=""
@@ -156,7 +157,11 @@ _hotspot_resolver() {
   local \
     _command="${1}" \
     _target_host="${2}" \
-    _target_device="${3}"
+    _target_device="${3}" \
+    _target_network="${4}" \
+    _target_gateway="${5}" \
+    _target_address="${6}" \
+    _global_setting="${7}" \
     _args=()
   if [[ "${_command}" == "get" ]]; then
     _args=(
@@ -170,6 +175,7 @@ _hotspot_resolver() {
       "${_target_host}"
       "${_target_device}"
       "${_target_address}"
+      "${_global_setting}"
     )
   fi
   "_${_command}_host_address" \
@@ -181,14 +187,19 @@ _set_host_address() {
     _host="${1}" \
     _device="${2}" \
     _address="${3}" \
-    _msg=()
+    _global="${4}" \
+    _msg=() \
+    _conf
   _msg=(
     "Setting address ${_address} for ${_host}."
   )
   _msg_info \
     "${_msg[*]}"
+  _conf="$(
+    _get_conf_path \
+      "${_global}")"
   _make_conf \
-    "$(_get_conf_path)" \
+    "${_conf}" \
     "${_host}" \
     "${_device}" \
     "${_address}" \
@@ -495,6 +506,7 @@ _make_conf() {
       "_address" \
       "${_msg[*]}"
   fi
+  _pref="${_address##*.}"
   if [[ "${_address}" == "" ]]; then
     _path="$(
       _get_conf_path \
@@ -521,17 +533,39 @@ _get_conf() {
     _host="${1}" \
     _device="${2}" \
     _conf \
+    _conf_dir \
+    _conf_global \
     _cfg \
     _msg=()
   _conf="$(
     _get_conf_path)"
   if [[ ! -e  "${_conf}" ]]; then
-    _make_conf \
-      "${_conf}" \
-      "${_host}" \
-      "${_device}" \
-      "" \
-      "true"
+    _conf_global="$(
+      _get_conf_path \
+        "y")"
+    if [[ -e "${_conf_global}" ]]; then
+      _conf_dir="$(
+        dirname \
+          "${_conf}")"
+      mkdir \
+        -p \
+        "${_conf_dir}"
+      cp \
+        "${_conf_global}" \
+        "${_conf}"
+    else
+      _msg=(
+        "No global setting for host"
+        "'${_host}', creating empty configuration"
+        "at '${_conf}'."
+      )
+      _make_conf \
+        "${_conf}" \
+        "${_host}" \
+        "${_device}" \
+        "" \
+        "true"
+    fi
   fi
   _check_conf \
     "${_conf}"
@@ -540,8 +574,11 @@ _get_conf() {
       "${_conf}" \
       "${_host}")"
   if [[ "${_cfg}" == "" ]]; then
+    _msg=(
+      "No address configured for ${_host}."
+    )
     _msg_error \
-      "No address configured for ${_host}" \
+      "${_msg[*]}" \
       1
     _make_conf \
       "${_conf}" \
@@ -579,6 +616,16 @@ _get_conf_path() {
 }
 
 _set_overrides() {
+  if [[ -v override_quiet ]]; then
+    quiet="${override_quiet}"
+  elif [[ -z "${quiet}" ]]; then
+    quiet="y"
+  fi
+  if [[ -v override_color ]]; then
+    color="${override_color}"
+  elif [[ -z "${color}" ]]; then
+    color="n"
+  fi
   _set_override \
     "target" \
     "network" \
@@ -591,16 +638,10 @@ _set_overrides() {
     "target" \
     "gateway" \
     "n"
-  if [[ -v override_quiet ]]; then
-    quiet="${override_quiet}"
-  elif [[ -z "${quiet}" ]]; then
-    quiet="y"
-  fi
-  if [[ -v override_color ]]; then
-    color="${override_color}"
-  elif [[ -z "${color}" ]]; then
-    color="n"
-  fi
+  _set_override \
+    "global" \
+    "setting" \
+    "n"
 }
 
 # Show help usage, with an exit status.
@@ -630,6 +671,9 @@ usage:
      -n <ssid_bsid>       Specify wireless network ssid
                           Default: '${target_network}'
      -g                   Specify host is the gateway
+     -G                   Global setting
+                          (for set command).
+                          Default: '${global_setting}'
 
      -h                   This message.
      -c                   Enable color output
@@ -670,6 +714,7 @@ _show_config() {
   _msg_info "                   Device:   ${target_device}"
   _msg_info "                  Network:   ${target_network}"
   _msg_info "                  Gateway:   ${target_gateway}"
+  _msg_info "                   Global:   ${global_setting}"
 }
 
 _globals
@@ -680,7 +725,7 @@ _config_user_init \
 # shellcheck disable=SC2034
 while \
   getopts \
-    'd:n:gcvh?' \
+    'd:n:gGcvh?' \
     arg; do
   case \
     "${arg}" in
@@ -690,6 +735,8 @@ while \
       override_target_network="${OPTARG}" ;;
     g)
       override_target_gateway="y" ;;
+    G)
+      override_global_setting="y" ;;
     c)
       override_color="y" ;;
     v)
@@ -725,13 +772,17 @@ if (( $# < 2 )); then
   _usage \
     1
 fi
-(( $# < 2 )) && \
+if (( $# < 2 )); then
+  _msg=(
+    "No host given."
+  )
   _msg_error \
-    "no host given" \
-    0 && \
-  _set_overrides && \
+    "${_msg[*]}" \
+    0
+  _set_overrides
   _usage \
     1
+fi
 target_command="${1}"
 target_host="${2}"
 if (( $# == 3 )); then
@@ -755,6 +806,10 @@ app_opts=(
   "${target_command}"
   "${target_host}"
   "${target_device}"
+  "${target_network}"
+  "${target_gateway}"
+  "${target_address}"
+  "${global_setting}"
 )
 _hotspot_resolver \
   "${app_opts[@]}"
