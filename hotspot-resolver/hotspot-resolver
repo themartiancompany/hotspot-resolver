@@ -729,7 +729,9 @@ _usage() {
       -d '' \
       _usage_text << \
         ENDUSAGETEXT || true
-Returns an host address for given network on a given network device
+
+Returns an host address for given network on a given network device.
+
 usage:
   ${app_name}
     [options]
@@ -752,6 +754,7 @@ usage:
      -h                   This message.
      -c                   Enable color output
      -v                   Enable verbose output
+
 ENDUSAGETEXT
   _printf \
     '%s\n' \
