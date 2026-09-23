@@ -784,6 +784,7 @@ _show_config() {
     "${SOURCE_DATE_EPOCH}"
   _msg_info "${app_name} configuration"
   _msg_info "             Resolve date:   ${_resolve_date}"
+  _msg_info "           Target command:   ${target_command}"
   _msg_info "              Target host:   ${target_host}"
   _msg_info "                   Device:   ${target_device}"
   _msg_info "                  Network:   ${target_network}"
