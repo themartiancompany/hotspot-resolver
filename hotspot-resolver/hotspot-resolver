@@ -66,6 +66,10 @@ _requirements() {
       "termux-api"
     _check_cmd \
       "jq"
+  else
+    _check_cmd \
+      "nmcli" \
+      "networkmanager"
   fi
   _check_cmd \
     "hostnamectl"
@@ -92,13 +96,35 @@ _termux_get_network_bssid() {
 _get_network_ssid() {
   local \
     _ssid \
+    _msg=()
   _ssid="$(
     iwgetid \
       -r)"
   if [[ "${_ssid}" == "" ]]; then
-    if [[ "${TERMUX_VERSION}" != "" ]]; then
+    if [[ -v "TERMUX_VERSION" ]]; then
+      if [[ "${TERMUX_VERSION}" != "" ]]; then
+        _ssid="$(
+          _termux_get_network_ssid)"
+      fi
+    else
       _ssid="$(
-        _termux_get_network_ssid)"
+        nmcli \
+          device \
+            show \
+              "${_target_device}" |
+          grep \
+            "GENERAL.CONNECTION" |
+          awk \
+            '{print $2}')"
+      if [[ "${_ssid}" == "--" ]]; then
+        _msg=(
+          "You are not connected to any"
+          "Wi-Fi network."
+        )
+        _msg_error \
+          "${_msg[*]}" \
+          1
+      fi
     fi
   fi
   echo \
